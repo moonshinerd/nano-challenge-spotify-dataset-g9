@@ -455,4 +455,8 @@ Para começar, eu escolheria uma pergunta de negócio/análise específica, como
 //Tratamento de dados
 Dado que falta 
 Dado duplicado
--> uma música pode ter mais de um 
+-> uma música pode ter mais de um gênero
+observação: tratamento de dados 
+-> é importante para não ter duplicidade de informações 
+-> nomes das variáveis tratados
+-> agrupamento dos ritmos 

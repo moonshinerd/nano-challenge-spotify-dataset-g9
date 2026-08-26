@@ -8,11 +8,36 @@
 import pandas as pd
 
 # carrega o dataset
-df = pd.read_csv('dataset(in).csv')
+df = pd.read_csv('dataset(in).csv', index_col=0)
+df.dropna(subset=['track_name', 'artists'], inplace=True)
+
+# --- TRATAMENTO DE CARACTERES (Mojibake) ---
+# Resolve o problema de acentos quebrados (ex: TitÃ­ Me PreguntÃ³)
+def fix_mojibake(text):
+    if not isinstance(text, str):
+        return text
+    try:
+        return text.encode('latin1').decode('utf-8')
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return text
+
+for col in ['track_name', 'album_name', 'artists']:
+    df[col] = df[col].apply(fix_mojibake)
+
 
 # Criação de um dataframe sem faixas duplicadas (para análises que não envolvem track_genre)
-# Isso evita que faixas com múltiplos gêneros entrem várias vezes na mesma conta
-df_unique = df.drop_duplicates(subset=['track_id'])
+# Isso evita que a mesma música (mesmo nome e artista, mas com IDs diferentes por conta de álbuns/singles) distorça as contas.
+# Mapeamos e concatenamos os gêneros e os IDs caso a música pertença a mais de um.
+agrupado_por_musica = df.groupby(['track_name', 'artists'], dropna=False).agg({
+    'track_genre': lambda x: ', '.join(x.dropna().astype(str).unique()),
+    'track_id': lambda x: ', '.join(x.dropna().astype(str).unique())
+}).reset_index()
+
+# Ordenamos por popularidade para manter a versão mais popular da faixa.
+df_unique = df.sort_values('popularity', ascending=False).drop_duplicates(subset=['track_name', 'artists'])
+
+# Trazemos as colunas com todos os gêneros e IDs concatenados para o df_unique
+df_unique = pd.merge(df_unique.drop(columns=['track_genre', 'track_id']), agrupado_por_musica, on=['track_name', 'artists'], how='left')
 
 # --- ANÁLISES DE GÊNERO (Usa df com as duplicatas de gênero mantidas) ---
 generos = df['track_genre'].nunique()
@@ -65,7 +90,7 @@ popularidade_media_por_artista = df_unique.groupby('artists')['popularity'].mean
 top_10_artistas_populares = popularidade_media_por_artista.head(10)
 
 # 4. As músicas mais populares são relacionadas a algum artista em específico?
-musicas_mais_populares = df_unique.nlargest(10, 'popularity')[['track_name', 'artists', 'popularity']]
+musicas_mais_populares = df_unique.nlargest(10, 'popularity')[['track_name', 'artists', 'popularity', 'track_genre']]
 
 # 5. Músicas explícitas são, em média, mais populares?
 popularidade_explicitas = df_unique.groupby('explicit')['popularity'].mean()
