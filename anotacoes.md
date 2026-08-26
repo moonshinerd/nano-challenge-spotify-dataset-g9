@@ -2,19 +2,27 @@
 
 1) Análise exploratória de dados
 
+## popularity
 Quais gêneros têm maior popularity média?
 Músicas populares tendem a ser mais danceability?
 Música só são mais populares por causa da popularidade do artista? 
 As músicas mais populares são relacionadas a algum artista em específico?
-Existe relação entre energy e loudness?
-Músicas acústicas tendem a ter menor energy?
-Quais gêneros têm maior valence?
 Músicas explícitas são, em média, mais populares?
-Qual a distribuição de duração das músicas?
-Quais gêneros possuem BPM mais alto?
-Existe relação entre tempo e danceability?
 Músicas instrumentais são menos populares?
-Quais características diferenciam rock, acoustic, hip-hop, classical etc.?
+Músicas com BPM mais alto são mais populares?
+
+## sentimento que a musica evoca (key, mode, valence, energy)
+Existe relação entre energy e loudness?
+Músicas acousticness tendem se relacionam a quais variaveis?
+a relação do sentimento gerado pela muica com a dançabilidade e como isso se relaciona com o restante das variaveis?
+a relação entre liveness com danceability e loudness?
+
+## generos
+Quais gêneros têm maior valence, (key e mode) e como isso se relaciona com o restante da variaveis?
+Quais generos tem mais acusticos e como isso se relaciona com o restante das variaveis?
+quais generos tem speechiness e como isso se relaciona com o restante das variaveis?
+Quais gêneros possuem BPM mais alto?
+Quais características diferenciam generos(rock, acoustic, hip-hop, classical etc.)?
 
 Por exemplo, você poderia produzir uma matriz de correlação entre:
 
@@ -442,3 +450,9 @@ Pandas → NumPy → Matplotlib → Scikit-learn → avaliação de modelos → 
 E há uma limitação importante: com essas colunas você consegue fazer principalmente um recomendador baseado nas características da música. Você não tem dados de comportamento de usuários, como quem ouviu o quê, likes ou playlists individuais, então não daria para fazer uma filtragem colaborativa de verdade apenas com esse dataset.
 
 Para começar, eu escolheria uma pergunta de negócio/análise específica, como "é possível prever o gênero de uma música apenas pelas características de áudio?". É suficientemente interessante para você praticar EDA, pré-processamento, classificação e avaliação de modelos sem o projeto ficar gigantesco.
+
+
+//Tratamento de dados
+Dado que falta 
+Dado duplicado
+-> uma música pode ter mais de um 
