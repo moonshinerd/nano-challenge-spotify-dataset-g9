@@ -121,4 +121,3 @@ if comparacao_generos.empty:
 	print('Nenhum dos gêneros de referência foi encontrado na planilha.')
 else:
 	print(comparacao_generos.round(3))
-print('\nObservação: correlação mostra associação nos dados e não prova causalidade.')
