@@ -79,7 +79,12 @@ PERFIS = {
     },
     'ROMANCE': {
         'tempo': 'baixo', 'energy': 'baixo', 'valence': 'baixo',
-        'loudness': 'alto', 'speechiness': 'alto', 'instrumentalness': 'baixo',
+        'speechiness': 'alto', 'instrumentalness': 'baixo',
+        # loudness alto foi removido da regra original em docs/perfil_musical.md:
+        # loudness tem correlação de 0.76 com energy (ver docs/anotacoes.md e
+        # insights_sentimento.py), então "energy baixo + loudness alto" é uma
+        # combinação quase inexistente no dataset (apenas 5 faixas). Sem essa
+        # condição, sobram 171 candidatas, suficiente para montar a playlist.
     },
 }
 

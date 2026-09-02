@@ -1,28 +1,31 @@
 # Anotações
 
+> ✅ = respondida. Ver os números e a interpretação completa em
+> [src/01_analise_exploratoria/analise.md](../src/01_analise_exploratoria/analise.md).
+
 1) Análise exploratória de dados
 
 ## popularity
-Quais gêneros têm maior popularity média?
-Músicas populares tendem a ser mais danceability?
-Música só são mais populares por causa da popularidade do artista? 
-As músicas mais populares são relacionadas a algum artista em específico?
-Músicas explícitas são, em média, mais populares?
-Músicas instrumentais são menos populares?
-Músicas com BPM mais alto são mais populares?
+✅ Quais gêneros têm maior popularity média?
+✅ Músicas populares tendem a ser mais danceability?
+✅ Música só são mais populares por causa da popularidade do artista? 
+✅ As músicas mais populares são relacionadas a algum artista em específico?
+✅ Músicas explícitas são, em média, mais populares?
+✅ Músicas instrumentais são menos populares?
+✅ Músicas com BPM mais alto são mais populares?
 
 ## sentimento que a musica evoca (key, mode, valence, energy)
-Existe relação entre energy e loudness?
-Músicas acousticness tendem se relacionam a quais variaveis?
-a relação do sentimento gerado pela muica com a dançabilidade e como isso se relaciona com o restante das variaveis?
-a relação entre liveness com danceability e loudness?
+✅ Existe relação entre energy e loudness?
+✅ Músicas acousticness tendem se relacionam a quais variaveis?
+✅ a relação do sentimento gerado pela muica com a dançabilidade e como isso se relaciona com o restante das variaveis?
+✅ a relação entre liveness com danceability e loudness?
 
 ## generos
-Quais gêneros têm maior valence, (key e mode) e como isso se relaciona com o restante da variaveis?
-Quais generos tem mais acusticos e como isso se relaciona com o restante das variaveis?
-quais generos tem speechiness e como isso se relaciona com o restante das variaveis?
-Quais gêneros possuem BPM mais alto?
-Quais características diferenciam generos(rock, acoustic, hip-hop, classical etc.)?
+✅ Quais gêneros têm maior valence, (key e mode) e como isso se relaciona com o restante da variaveis?
+✅ Quais generos tem mais acusticos e como isso se relaciona com o restante das variaveis?
+✅ quais generos tem speechiness e como isso se relaciona com o restante das variaveis?
+✅ Quais gêneros possuem BPM mais alto?
+✅ Quais características diferenciam generos(rock, acoustic, hip-hop, classical etc.)?
 
 Por exemplo, você poderia produzir uma matriz de correlação entre:
 
@@ -44,7 +47,7 @@ acousticness ↑ <-> energy ↓
 
 Não significa necessariamente causalidade, mas ajuda a entender os dados.
 
-2. Criar perfis de músicas
+2. Criar perfis de músicas — ✅ feito em `src/02_perfis_musicais/` (perfis por tercis) e `src/03_playlists/` (playlists RELAX/TREINO/ROMANCE/POPULAR, ideia igual à sugerida abaixo)
 
 Você pode transformar os valores numéricos em uma espécie de perfil musical.
 
@@ -101,7 +104,7 @@ energy < 0.50
 
 Isso já poderia virar um projeto bem legal.
 
-3. Machine Learning
+3. Machine Learning — ⏳ pendente (baixa prioridade, ver docs/atas/ata-01.md seção 7)
 
 A. Prever a popularidade de uma música
 
@@ -208,7 +211,7 @@ confusion matrix
 
 Esse é provavelmente um dos projetos de ML mais naturais para esse dataset.
 
-4. Sistema de recomendação musical
+4. Sistema de recomendação musical — ✅ feito em `src/04_recomendacao/` (similaridade de cosseno sobre o perfil de áudio, por música ou por grupo de músicas)
 
 
 Você pode criar um recomendador baseado em conteúdo.
@@ -275,7 +278,7 @@ sistema de recomendação
 
 E pode ficar muito bom no GitHub.
 
-5. Descobrir grupos de músicas automaticamente
+5. Descobrir grupos de músicas automaticamente — ⏳ possível extensão, não iniciada
 
 Você pode fazer Machine Learning não supervisionado.
 
@@ -325,7 +328,7 @@ As características acústicas das músicas conseguem reproduzir naturalmente os
 
 Esse já é um problema de análise bastante interessante.
 
-6. Criar um mapa das músicas
+6. Criar um mapa das músicas — ⏳ possível extensão, não iniciada
 
 Você também pode usar redução de dimensionalidade, como:
 
@@ -359,7 +362,7 @@ se separam naturalmente quando analisamos suas características.
 
 É uma visualização ótima para projeto acadêmico.
 
-7. Investigar o que faz uma música popular
+7. Investigar o que faz uma música popular — ✅ parcialmente respondida (correlações em `insights_popularity.py`); feature importance via Random Forest ainda não feito
 
 Esse seria um ótimo tema de análise.
 
@@ -401,7 +404,7 @@ e não:
 
 "causa popularidade".
 
-8. Analisar gêneros
+8. Analisar gêneros — ✅ feito em `src/01_analise_exploratoria/insights_genero.py`
 
 Outra possibilidade é montar o perfil médio de cada gênero.
 
