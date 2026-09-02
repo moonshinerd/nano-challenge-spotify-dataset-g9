@@ -28,10 +28,19 @@ def init_db():
     df_unique['explicit'] = df_unique['explicit'].astype(int)
 
     print("Calculando matriz normalizada (z-score)...")
+    from weights import FEATURE_WEIGHTS
+    
     medias = df_unique[FEATURES].mean()
     desvios = df_unique[FEATURES].std()
     
-    matriz_normalizada = ((df_unique[FEATURES] - medias) / desvios).to_numpy(dtype=float)
+    matriz_normalizada = ((df_unique[FEATURES] - medias) / desvios)
+    
+    # Aplicando os pesos nas features
+    for feat in FEATURES:
+        weight = FEATURE_WEIGHTS.get(feat, 1.0)
+        matriz_normalizada[feat] = matriz_normalizada[feat] * weight
+        
+    matriz_normalizada = matriz_normalizada.to_numpy(dtype=float)
     
     print("Preparando dados para inserção no banco...")
     # Extrair track_id corretamente

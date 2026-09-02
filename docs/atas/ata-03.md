@@ -20,7 +20,11 @@ MÚSICAS POSSIVELMENTE MAIS FAMOSAS QUE UNHOLY
         STAY - JUSTIN BIEBER -> 4.059.265.433
         AT IT WAS - HARRY STYLES -> 4.601.496.645
         Biliie Jean - MICHAEL JACKSON -> 3.202.102.828
-        Despacito -> Luis Fonsi - 2.206.837.588
+        Despacito -> Luis Fo
+        
+        nsi - 2.206.837.588
 
 
 SCHMIDT.MONSTER -> COMPRAMOS UM DOMÍNIO PARA APRESENTAR
+
+-> Utilização de API's 
