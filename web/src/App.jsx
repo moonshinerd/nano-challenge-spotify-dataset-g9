@@ -2,6 +2,17 @@ import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import { Search, Play, Pause, X, Loader2, Music, SkipBack, SkipForward, Wand2, ListMusic } from 'lucide-react'
 
+// Placeholder cinza (SVG inline) para quando a URL da capa existe mas a
+// imagem falha ao carregar (link quebrado/expirado) — sem isso, o <img>
+// mostra o texto do `alt` no lugar da capa, o que fica feio na lista.
+const FALLBACK_COVER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#374151"/></svg>'
+)
+const handleCoverError = (e) => {
+  e.target.onerror = null
+  e.target.src = FALLBACK_COVER
+}
+
 function App() {
   const [errorMsg, setErrorMsg] = useState(null);
   const [toast, setToast] = useState(null);
@@ -41,6 +52,25 @@ function App() {
   const [showQueue, setShowQueue] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
   const audioRef = useRef(null)
+  // Contador de "qual foi a última busca disparada": se o usuário busca de
+  // novo antes da resposta anterior chegar, e essa resposta antiga demorar
+  // mais que a nova (a rede não garante ordem de chegada), ela sobrescrevia
+  // o resultado novo com um antigo — aparecia como "uma música da busca
+  // anterior no topo". Só aplicamos a resposta se ela ainda for a mais
+  // recente disparada.
+  const searchRequestIdRef = useRef(0)
+  // Segura o timeout do debounce do spinner de buffering (ver onWaiting
+  // abaixo) — sem isso, qualquer micro-engasgo da rede (ex.: uma busca
+  // competindo por banda/thread com o áudio já tocando) faz o botão de
+  // pausar piscar um spinner de carregando, mesmo a música seguindo tocando.
+  const bufferingTimeoutRef = useRef(null)
+  // Altura real do player fixo, medida dinamicamente: no mobile ele quebra
+  // linha (thumbnail+título, controles, barra de progresso) e a altura
+  // varia bastante — um pb-48 fixo não é suficiente e a barra acaba
+  // cobrindo o último item da lista. Com o ResizeObserver, o espaço
+  // reservado no fim da página sempre bate com a altura real do player.
+  const playerRef = useRef(null)
+  const [playerHeight, setPlayerHeight] = useState(0)
   const [loadingSearch, setLoadingSearch] = useState(false)
   const [loadingRecs, setLoadingRecs] = useState(false)
 
@@ -50,6 +80,13 @@ function App() {
   // sem precisar fixar um IP no docker-compose.yml (que muda a cada rede
   // Docker recriada). VITE_API_URL continua funcionando como override manual.
   const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000`
+
+  // Passa as capas pelo nosso backend (/thumbnail) em vez de carregar
+  // direto de googleusercontent.com/mzstatic.com: algumas redes/navegadores
+  // (bloqueadores de anúncio por DNS, modo privacidade mobile) bloqueiam
+  // esses domínios de CDN, deixando a capa sempre quebrada. Servindo do
+  // nosso próprio domínio, contorna esse bloqueio.
+  const proxiedThumb = (url) => url ? `${API_URL}/thumbnail?url=${encodeURIComponent(url)}` : url
 
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0)
 
@@ -80,6 +117,21 @@ function App() {
     }
   }, [currentPlaying]);
 
+  // Mede a altura real do player fixo (muda com o layout/quebra de linha
+  // em telas menores) pra reservar o espaço certo no fim da página.
+  useEffect(() => {
+    if (!currentPlaying || !playerRef.current) {
+      setPlayerHeight(0);
+      return;
+    }
+    const el = playerRef.current;
+    const update = () => setPlayerHeight(el.offsetHeight);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [currentPlaying]);
+
   const togglePlayPause = () => {
     if (audioRef.current) {
       if (isPlaying) {
@@ -101,16 +153,19 @@ function App() {
   const searchSongs = async (e) => {
     e.preventDefault()
     if (!query) return
+    const requestId = ++searchRequestIdRef.current
     setLoadingSearch(true)
     try {
       const res = await axios.get(`${API_URL}/search?query=${query}`)
+      if (requestId !== searchRequestIdRef.current) return // uma busca mais nova já foi disparada; ignora essa resposta atrasada
       setSearchResults(res.data.results)
       setRecommendations(null)
     } catch (error) {
+      if (requestId !== searchRequestIdRef.current) return
       console.error(error)
       setToast("Erro ao buscar músicas."); setTimeout(() => setToast(null), 5000)
     }
-    setLoadingSearch(false)
+    if (requestId === searchRequestIdRef.current) setLoadingSearch(false)
   }
 
   const toggleTrackSelection = (track) => {
@@ -248,7 +303,10 @@ function App() {
   }
 
   return (
-    <div className={`min-h-screen p-4 md:p-8 max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 justify-center transition-all duration-300 ${currentPlaying ? "pb-48" : "pb-12"}`}>
+    <div
+      className="min-h-screen p-4 md:p-8 pb-12 max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 justify-center transition-all duration-300"
+      style={currentPlaying ? { paddingBottom: playerHeight + 32 } : undefined}
+    >
       {/* TOAST NOTIFICATION */}
       {toast && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-3 animate-fade-in">
@@ -288,7 +346,7 @@ function App() {
               <div key={track.track_id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 hover:bg-gray-700 rounded-lg transition-colors gap-3 sm:gap-0">
                 <div className="flex items-center gap-4">
                   {track.thumbnail ? (
-                    <img src={track.thumbnail} alt="Capa" className="w-12 h-12 rounded object-cover" />
+                    <img src={proxiedThumb(track.thumbnail)} alt="Capa" onError={handleCoverError} className="w-12 h-12 rounded object-cover" />
                   ) : (
                     <div className="w-12 h-12 bg-gray-600 rounded flex items-center justify-center">🎵</div>
                   )}
@@ -360,11 +418,11 @@ function App() {
               {recommendations.reference.thumbnails && recommendations.reference.thumbnails.length > 0 ? (
                 <div className={`w-full h-full grid ${recommendations.reference.thumbnails.length >= 4 ? 'grid-cols-2 grid-rows-2' : recommendations.reference.thumbnails.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                   {recommendations.reference.thumbnails.slice(0,4).map((thumb, i) => (
-                    <img key={i} src={thumb} alt="Capa Mix" className={`w-full h-full object-cover ${recommendations.reference.thumbnails.length === 3 && i === 0 ? 'col-span-2 row-span-1 h-20' : ''}`} />
+                    <img key={i} src={proxiedThumb(thumb)} alt="Capa Mix" onError={handleCoverError} className={`w-full h-full object-cover ${recommendations.reference.thumbnails.length === 3 && i === 0 ? 'col-span-2 row-span-1 h-20' : ''}`} />
                   ))}
                 </div>
               ) : recommendations.reference.thumbnail ? (
-                <img src={recommendations.reference.thumbnail} alt="Capa" className="w-full h-full object-cover" />
+                <img src={proxiedThumb(recommendations.reference.thumbnail)} alt="Capa" onError={handleCoverError} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-500">Sem Imagem</div>
               )}
@@ -392,7 +450,7 @@ function App() {
                         className="bg-gray-800 hover:bg-gray-700 hover:text-green-400 text-gray-300 text-xs px-3 py-1.5 rounded-md border border-gray-700 flex items-center gap-2 transition-colors group cursor-pointer"
                         title="Ouvir Faixa"
                       >
-                        {t.thumbnail && <img src={t.thumbnail} className="w-4 h-4 rounded-sm object-cover" />}
+                        {t.thumbnail && <img src={proxiedThumb(t.thumbnail)} onError={handleCoverError} className="w-4 h-4 rounded-sm object-cover" />}
                         <Play size={12} className="hidden group-hover:inline-block text-green-500" />
                         <span>{t.track_name}</span>
                       </button>
@@ -438,7 +496,7 @@ function App() {
                   <div className="w-8 text-center text-gray-500 font-bold">{i + 1}</div>
                   
                   {rec.thumbnail ? (
-                    <img src={rec.thumbnail} alt="Capa" className="w-16 h-16 rounded shadow-md" />
+                    <img src={proxiedThumb(rec.thumbnail)} alt="Capa" onError={handleCoverError} className="w-16 h-16 rounded shadow-md" />
                   ) : (
                     <div className="w-16 h-16 bg-gray-700 rounded" />
                   )}
@@ -491,7 +549,7 @@ function App() {
                 <div key={idx} className="bg-gray-900 p-3 rounded-xl flex items-center justify-between group">
                   <div className="flex items-center gap-3 overflow-hidden">
                     {t.thumbnail ? (
-                      <img src={t.thumbnail} alt="" className="w-10 h-10 rounded object-cover" />
+                      <img src={proxiedThumb(t.thumbnail)} alt="" onError={handleCoverError} className="w-10 h-10 rounded object-cover" />
                     ) : (
                       <div className="w-10 h-10 bg-gray-800 rounded flex items-center justify-center">
                         <Music size={16} className="text-gray-500" />
@@ -552,10 +610,10 @@ function App() {
 
       {/* GLOBAL AUDIO PLAYER */}
       {currentPlaying && (
-        <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 p-4 px-4 sm:px-8 flex flex-wrap sm:flex-nowrap items-center justify-between z-50 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] gap-4 sm:gap-0">
+        <div ref={playerRef} className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 p-4 px-4 sm:px-8 flex flex-wrap sm:flex-nowrap items-center justify-between z-50 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] gap-4 sm:gap-0">
           <div className="flex items-center gap-4 w-1/3">
             {currentPlaying.thumbnail ? (
-              <img src={currentPlaying.thumbnail} alt="Capa" className="w-14 h-14 rounded shadow-lg" />
+              <img src={proxiedThumb(currentPlaying.thumbnail)} alt="Capa" onError={handleCoverError} className="w-14 h-14 rounded shadow-lg" />
             ) : (
               <div className="w-14 h-14 bg-gray-800 rounded flex items-center justify-center">
                 <Music size={24} className="text-gray-500" />
@@ -577,10 +635,9 @@ function App() {
                 <SkipBack size={20} />
               </button>
               
-              <button 
+              <button
                 onClick={togglePlayPause}
                 className="w-10 h-10 flex items-center justify-center bg-white text-black rounded-full hover:scale-105 transition-transform"
-                disabled={isBuffering}
               >
                 {isBuffering ? (
                   <Loader2 size={20} className="animate-spin" />
@@ -625,12 +682,27 @@ function App() {
 
             <audio 
               ref={audioRef}
-              src={currentPlaying.streamUrl} 
-              autoPlay 
-              onTimeUpdate={() => setProgress(audioRef.current?.currentTime || 0)}
+              src={currentPlaying.streamUrl}
+              autoPlay
               onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
-              onPlaying={() => { setIsPlaying(true); setIsBuffering(false); }}
-              onWaiting={() => setIsBuffering(true)}
+              onPlaying={() => {
+                clearTimeout(bufferingTimeoutRef.current);
+                setIsPlaying(true);
+                setIsBuffering(false);
+              }}
+              onTimeUpdate={() => {
+                clearTimeout(bufferingTimeoutRef.current);
+                setIsBuffering(false);
+                setProgress(audioRef.current?.currentTime || 0);
+              }}
+              onWaiting={() => {
+                // Só mostra o spinner se o engasgo durar mais que 500ms —
+                // micro-stalls (ex.: uma busca competindo por rede com o
+                // áudio já tocando) se resolvem sozinhos rápido demais pra
+                // valer a pena mostrar loading no botão de pausar.
+                clearTimeout(bufferingTimeoutRef.current);
+                bufferingTimeoutRef.current = setTimeout(() => setIsBuffering(true), 500);
+              }}
               onPause={() => setIsPlaying(false)}
               onEnded={handleNextTrack}
               className="hidden"

@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import config
-from routers import play, recommend, search
+from routers import play, recommend, search, thumbnail
 from services import youtube_service
 
 
@@ -66,3 +66,4 @@ app.add_middleware(
 app.include_router(search.router)
 app.include_router(play.router)
 app.include_router(recommend.router)
+app.include_router(thumbnail.router)
