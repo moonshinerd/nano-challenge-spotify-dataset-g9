@@ -8,7 +8,6 @@ from psycopg2.extras import execute_values
 sys.path.insert(0, '/src/shared')
 from dados import carregar_dataset, construir_df_unique
 
-# Usando psycopg2 diretamente para lidar com cast de vetores de forma mais fácil
 DB_HOST = "db"
 DB_NAME = "spotify"
 DB_USER = "user"
@@ -20,9 +19,34 @@ FEATURES = [
     'duration_ms', 'explicit', 'time_signature',
 ]
 
+def create_table_if_not_exists(cur):
+    print("Verificando/Criando tabela 'tracks' e extensão vector...")
+    cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS tracks (
+            track_id VARCHAR PRIMARY KEY,
+            track_name VARCHAR,
+            artists VARCHAR,
+            track_genre VARCHAR,
+            embedding vector(14)
+        );
+    """)
+    print("Tabela 'tracks' pronta.")
+
 def init_db():
-    print("Carregando CSV...")
+    print("Conectando ao PostgreSQL...")
+    conn = psycopg2.connect(host=DB_HOST, dbname=DB_NAME, user=DB_USER, password=DB_PASS)
+    cur = conn.cursor()
+    
+    create_table_if_not_exists(cur)
+    conn.commit()
+
+    print("Carregando CSV original (Base Kaggle)...")
     dataset_path = Path("/data/raw/dataset.csv")
+    if not dataset_path.exists():
+        print("Arquivo base não encontrado. Pulando importação original.")
+        return
+
     df = carregar_dataset(dataset_path)
     df_unique = construir_df_unique(df)
     df_unique['explicit'] = df_unique['explicit'].astype(int)
@@ -35,7 +59,6 @@ def init_db():
     
     matriz_normalizada = ((df_unique[FEATURES] - medias) / desvios)
     
-    # Aplicando os pesos nas features
     for feat in FEATURES:
         weight = FEATURE_WEIGHTS.get(feat, 1.0)
         matriz_normalizada[feat] = matriz_normalizada[feat] * weight
@@ -43,14 +66,11 @@ def init_db():
     matriz_normalizada = matriz_normalizada.to_numpy(dtype=float)
     
     print("Preparando dados para inserção no banco...")
-    # Extrair track_id corretamente
     track_ids = df_unique['track_id'].apply(lambda x: x.split(', ')[0] if isinstance(x, str) else x).tolist()
     track_names = df_unique['track_name'].tolist()
     artists = df_unique['artists'].tolist()
     track_genres = df_unique['track_genre'].tolist()
     
-    # Prepara lista de tuplas para inserção em lote
-    # Converte o numpy array de volta para list para o psycopg2
     data_to_insert = []
     for i in range(len(track_ids)):
         vec_str = "[" + ",".join(map(str, matriz_normalizada[i])) + "]"
@@ -62,32 +82,19 @@ def init_db():
             vec_str
         ))
         
-    print("Conectando ao PostgreSQL...")
-    conn = psycopg2.connect(host=DB_HOST, dbname=DB_NAME, user=DB_USER, password=DB_PASS)
-    cur = conn.cursor()
-    
-    print(f"Inserindo {len(data_to_insert)} músicas no banco de forma otimizada...")
-    # Inserção em massa com cast explícito para vetor
+    print(f"Inserindo {len(data_to_insert)} músicas originais no banco...")
     insert_query = """
         INSERT INTO tracks (track_id, track_name, artists, track_genre, embedding)
         VALUES %s
         ON CONFLICT (track_id) DO NOTHING
     """
     
-    # execute_values lida muito bem com grandes lotes (page_size 1000)
-    # Precisamos do cast ::vector no template? execute_values usa %s para os valores,
-    # psycopg2 passará a string e o postgres pode fazer o cast automático na tabela tipada,
-    # mas para garantir podemos omitir o cast e deixar o postgresolicitar.
-    # Como a tabela já tem 'embedding vector(14)', enviar texto " [1,2,3] " faz cast implícito no psycopg2 em DML simples.
-    # Mas execute_values cria a query.
-    # A melhor forma é usar execute_values normal:
-    
     execute_values(cur, insert_query, data_to_insert, page_size=2000)
     
     conn.commit()
     cur.close()
     conn.close()
-    print("Banco de dados populado com sucesso!")
+    print("Banco de dados populado com sucesso (Base Original)!")
 
 if __name__ == "__main__":
     init_db()

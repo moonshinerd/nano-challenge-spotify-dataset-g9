@@ -1,8 +1,32 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Search, Play, Pause, X, Loader2, Music, SkipBack, SkipForward } from 'lucide-react'
+import { Search, Play, Pause, X, Loader2, Music, SkipBack, SkipForward, Wand2, ListMusic } from 'lucide-react'
 
 function App() {
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [toast, setToast] = useState(null);
+  
+  useEffect(() => {
+    const handleErr = (msg, url, line, col, error) => {
+      setErrorMsg(`${msg} - ${error?.stack}`);
+      return false; 
+    };
+    window.onerror = handleErr;
+    window.addEventListener('unhandledrejection', (e) => {
+      setErrorMsg(`Unhandled Promise Rejection: ${e.reason?.message} - ${e.reason?.stack}`);
+    });
+  }, []);
+  
+  if (errorMsg) {
+    return (
+      <div className="bg-red-900 text-white p-10 h-screen w-screen overflow-auto">
+        <h1 className="text-4xl font-bold">CRASH FATAL!</h1>
+        <pre className="mt-4 whitespace-pre-wrap">{errorMsg}</pre>
+        <button onClick={() => window.location.reload()} className="mt-4 bg-white text-black px-4 py-2 rounded">Reload</button>
+      </div>
+    );
+  }
+
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [recommendations, setRecommendations] = useState(null)
@@ -14,6 +38,7 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
   const [duration, setDuration] = useState(0)
+  const [showQueue, setShowQueue] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
   const audioRef = useRef(null)
   const [loadingSearch, setLoadingSearch] = useState(false)
@@ -78,7 +103,7 @@ function App() {
       setRecommendations(null)
     } catch (error) {
       console.error(error)
-      alert("Erro ao buscar músicas.")
+      setToast("Erro ao buscar músicas."); setTimeout(() => setToast(null), 5000)
     }
     setLoadingSearch(false)
   }
@@ -94,7 +119,8 @@ function App() {
   const getRecommendations = async (track_id, source) => {
     setLoadingRecs(true)
     setRecommendations(null)
-    setSearchResults([]) // limpa a busca na hora para mostrar o carregamento
+    const oldSearch = searchResults;
+    setSearchResults([])
     
     // Se for do Catálogo, é instantâneo, então travamos a mensagem no final
     if (source === 'database') {
@@ -106,7 +132,10 @@ function App() {
       setRecommendations(res.data)
     } catch (error) {
       console.error(error)
-      alert("Erro ao buscar recomendações.")
+      setSearchResults(oldSearch)
+      const msg = error.response?.data?.detail || "Erro ao buscar recomendações.";
+      setToast(msg)
+      setTimeout(() => setToast(null), 5000)
     }
     setLoadingRecs(false)
   }
@@ -135,7 +164,7 @@ function App() {
       setSelectedTracks([]) 
     } catch (error) {
       console.error(error)
-      alert("Erro ao buscar recomendações para a playlist.")
+      setToast("Erro ao buscar recomendações para a playlist."); setTimeout(() => setToast(null), 5000)
     }
     setLoadingRecs(false)
   }
@@ -214,8 +243,15 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen p-8 max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 pb-32">
-      <div className="flex-1 max-w-4xl">
+    <div className={`min-h-screen p-4 md:p-8 max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 justify-center transition-all duration-300 ${currentPlaying ? "pb-48" : "pb-12"}`}>
+      {/* TOAST NOTIFICATION */}
+      {toast && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-3 animate-fade-in">
+          <X size={18} className="cursor-pointer hover:text-gray-200" onClick={() => setToast(null)} />
+          <span className="font-bold text-sm md:text-base">{toast}</span>
+        </div>
+      )}
+      <div className="flex-1 w-full max-w-4xl mx-auto transition-all duration-500">
         <header className="mb-10 text-center">
           <h1 className="text-4xl font-bold text-green-500 mb-2">Music Recommender</h1>
           <p className="text-gray-400 mb-8">Descubra músicas semelhantes baseadas em atributos de áudio reais.</p>
@@ -244,7 +280,7 @@ function App() {
           <h2 className="text-xl font-bold mb-4">Resultados da Busca</h2>
           <div className="space-y-2">
             {searchResults.map(track => (
-              <div key={track.track_id} className="flex items-center justify-between p-3 hover:bg-gray-700 rounded-lg transition-colors">
+              <div key={track.track_id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 hover:bg-gray-700 rounded-lg transition-colors gap-3 sm:gap-0">
                 <div className="flex items-center gap-4">
                   {track.thumbnail ? (
                     <img src={track.thumbnail} alt="Capa" className="w-12 h-12 rounded object-cover" />
@@ -253,7 +289,7 @@ function App() {
                   )}
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-bold">{track.track_name}</p>
+                      <div className="marquee-wrapper max-w-[150px] sm:max-w-[300px]"><p className="font-bold marquee-text" title={track.track_name}>{track.track_name}</p></div>
                       {track.source === 'database' ? (
                         <span className="bg-gray-600 text-xs px-2 py-0.5 rounded text-white">Catálogo</span>
                       ) : (
@@ -261,7 +297,7 @@ function App() {
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <p className="text-sm text-gray-400">{track.artists}</p>
+                      <p className="text-sm text-gray-400 truncate max-w-[150px] sm:max-w-[300px]" title={track.artists}>{track.artists}</p>
                       {track.genre && track.genre.split(',').map((g, idx) => (
                         <span key={idx} className="bg-gray-700 text-gray-300 text-[10px] px-2 py-0.5 rounded-full border border-gray-600">
                           {g.trim()}
@@ -270,7 +306,7 @@ function App() {
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 self-end sm:self-auto">
                   <button 
                     onClick={() => toggleTrackSelection(track)}
                     className={`p-3 rounded-full transition-colors font-bold ${selectedTracks.find(t => t.track_id === track.track_id) ? 'bg-green-500 text-black' : 'bg-gray-800 hover:bg-gray-700 text-white'}`}
@@ -287,9 +323,10 @@ function App() {
                   </button>
                   <button 
                     onClick={() => getRecommendations(track.track_id, track.source)}
-                    className="px-6 py-3 bg-green-500 hover:bg-green-600 text-black font-bold rounded-full transition-transform hover:scale-105"
+                    className="px-4 py-2 sm:px-6 sm:py-3 bg-green-500 hover:bg-green-600 text-black font-bold rounded-full transition-transform hover:scale-105 flex items-center gap-2"
                   >
-                    Analisar & Recomendar
+                    <span className="hidden sm:inline">Analisar & Recomendar</span>
+                    <span className="sm:hidden flex items-center gap-1"><Wand2 size={16}/> Analisar</span>
                   </button>
                 </div>
               </div>
@@ -344,10 +381,16 @@ function App() {
                   <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 font-bold">Músicas Combinadas:</p>
                   <div className="flex flex-wrap gap-2">
                     {recommendations.reference.originalTracks.map((t, idx) => (
-                      <div key={idx} className="bg-gray-800 text-gray-300 text-xs px-3 py-1.5 rounded-md border border-gray-700 flex items-center gap-2">
+                      <button 
+                        key={idx} 
+                        onClick={() => handlePlay(t)}
+                        className="bg-gray-800 hover:bg-gray-700 hover:text-green-400 text-gray-300 text-xs px-3 py-1.5 rounded-md border border-gray-700 flex items-center gap-2 transition-colors group cursor-pointer"
+                        title="Ouvir Faixa"
+                      >
                         {t.thumbnail && <img src={t.thumbnail} className="w-4 h-4 rounded-sm object-cover" />}
+                        <Play size={12} className="hidden group-hover:inline-block text-green-500" />
                         <span>{t.track_name}</span>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -386,7 +429,7 @@ function App() {
             <h3 className="text-2xl font-bold mb-4">Recomendações</h3>
             <div className="grid gap-4">
               {recommendations.recommendations.map((rec, i) => (
-                <div key={i} className="bg-gray-800 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-750 transition-colors">
+                <div key={i} className="bg-gray-800 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-700 transition-colors">
                   <div className="w-8 text-center text-gray-500 font-bold">{i + 1}</div>
                   
                   {rec.thumbnail ? (
@@ -396,9 +439,9 @@ function App() {
                   )}
                   
                   <div className="flex-1">
-                    <p className="font-bold text-lg">{rec.track_name}</p>
+                    <div className="marquee-wrapper max-w-[150px] sm:max-w-[400px]"><p className="font-bold text-lg marquee-text" title={rec.track_name}>{rec.track_name}</p></div>
                     <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <p className="text-gray-400 text-sm">{rec.artists}</p>
+                      <p className="text-gray-400 text-sm truncate max-w-[150px] sm:max-w-[400px]" title={rec.artists}>{rec.artists}</p>
                       {rec.genre && rec.genre.split(',').map((g, idx) => (
                         <span key={idx} className="bg-gray-700 text-gray-300 text-[10px] px-2 py-0.5 rounded-full border border-gray-600">
                           {g.trim()}
@@ -450,27 +493,51 @@ function App() {
                       </div>
                     )}
                     <div className="truncate">
-                      <p className="text-sm font-bold text-white truncate">{t.track_name}</p>
-                      <p className="text-xs text-gray-400 truncate">{t.artists}</p>
+                      <div className="marquee-wrapper max-w-[120px] sm:max-w-[200px]"><p className="text-sm font-bold text-white marquee-text" title={t.track_name}>{t.track_name}</p></div>
+                      <div className="marquee-wrapper max-w-[120px] sm:max-w-[200px]"><p className="text-xs text-gray-400 marquee-text" title={t.artists}>{t.artists}</p></div>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => toggleTrackSelection(t)} 
-                    className="text-gray-500 hover:text-red-400 p-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Remover"
-                  >
-                    <X size={18} />
-                  </button>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => handlePlay(t)} 
+                      className="text-gray-400 hover:text-green-500 p-2"
+                      title="Ouvir"
+                    >
+                      <Play size={18} className={currentPlaying?.track_name === t.track_name ? "text-green-500" : ""} />
+                    </button>
+                    <button 
+                      onClick={() => toggleTrackSelection(t)} 
+                      className="text-gray-400 hover:text-red-400 p-2"
+                      title="Remover"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
             
-            <button 
-              onClick={getPlaylistRecommendations}
-              className="w-full bg-green-500 hover:bg-green-600 text-black py-4 rounded-xl font-bold text-lg transition-transform hover:scale-105 shadow-lg shadow-green-900/20"
-            >
-              Gerar Super Mix ✨
-            </button>
+            <div className="flex gap-4 mb-4">
+              <button 
+                onClick={() => {
+                   setPlayQueue(selectedTracks);
+                   const first = selectedTracks[0];
+                   setCurrentPlaying({
+                     ...first,
+                     streamUrl: `${API_URL}/play?query=${encodeURIComponent(first.track_name + ' ' + first.artists)}`
+                   });
+                }}
+                className="w-1/2 bg-white hover:bg-gray-200 text-black py-4 rounded-xl font-bold text-md transition-transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg"
+              >
+                <Play size={20} /> Tocar Lista
+              </button>
+              <button 
+                onClick={getPlaylistRecommendations}
+                className="w-1/2 bg-green-500 hover:bg-green-600 text-black py-4 rounded-xl font-bold text-md transition-transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg shadow-green-900/20"
+              >
+                Super Mix ✨
+              </button>
+            </div>
             <p className="text-gray-500 text-xs text-center mt-4">
               O sistema calculará o centróide matemático dos vetores acústicos para encontrar o ponto de equilíbrio perfeito entre as suas escolhas.
             </p>
@@ -480,7 +547,7 @@ function App() {
 
       {/* GLOBAL AUDIO PLAYER */}
       {currentPlaying && (
-        <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 p-4 px-8 flex items-center justify-between z-50 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+        <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 p-4 px-4 sm:px-8 flex flex-wrap sm:flex-nowrap items-center justify-between z-50 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] gap-4 sm:gap-0">
           <div className="flex items-center gap-4 w-1/3">
             {currentPlaying.thumbnail ? (
               <img src={currentPlaying.thumbnail} alt="Capa" className="w-14 h-14 rounded shadow-lg" />
@@ -490,8 +557,8 @@ function App() {
               </div>
             )}
             <div>
-              <p className="font-bold text-white text-sm md:text-base line-clamp-1">{currentPlaying.track_name}</p>
-              <p className="text-gray-400 text-xs md:text-sm line-clamp-1">{currentPlaying.artists}</p>
+              <div className="marquee-wrapper max-w-[150px] sm:max-w-[300px]"><p className="font-bold text-white text-sm md:text-base marquee-text" title={currentPlaying.track_name}>{currentPlaying.track_name}</p></div>
+              <div className="marquee-wrapper max-w-[150px] sm:max-w-[300px]"><p className="text-gray-400 text-xs md:text-sm marquee-text" title={currentPlaying.artists}>{currentPlaying.artists}</p></div>
             </div>
           </div>
           
@@ -565,7 +632,14 @@ function App() {
             />
           </div>
           
-          <div className="w-1/3 flex justify-end">
+          <div className="w-1/3 flex justify-end gap-2 relative">
+            <button 
+              onClick={() => setShowQueue(!showQueue)}
+              className={`p-2 transition-colors ${showQueue ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}
+              title="Fila de Reprodução"
+            >
+              <ListMusic size={20} />
+            </button>
             <button 
               onClick={() => setCurrentPlaying(null)}
               className="text-gray-400 hover:text-white p-2"
@@ -573,6 +647,39 @@ function App() {
             >
               <X size={24} />
             </button>
+
+            {/* Fila Popup */}
+            {showQueue && (
+              <div className="absolute bottom-full mb-4 right-0 sm:right-8 w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-4 max-h-96 overflow-y-auto custom-scrollbar flex flex-col gap-2">
+                <h4 className="font-bold text-white mb-2 sticky top-0 bg-gray-900 pb-2 border-b border-gray-800">Fila de Reprodução</h4>
+                {playQueue.length === 0 ? (
+                  <p className="text-gray-500 text-sm">Fila vazia</p>
+                ) : (
+                  playQueue.map((qTrack, idx) => (
+                    <div 
+                      key={idx} 
+                      onClick={() => {
+                        setCurrentPlaying({
+                          ...qTrack,
+                          streamUrl: `${API_URL}/play?query=${encodeURIComponent(qTrack.track_name + ' ' + qTrack.artists)}`
+                        });
+                      }}
+                      className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors group ${currentPlaying?.track_name === qTrack.track_name ? 'bg-gray-800 border border-gray-700' : 'hover:bg-gray-800'}`}
+                    >
+                      {currentPlaying?.track_name === qTrack.track_name ? (
+                        <Play size={14} className="text-green-500 shrink-0" />
+                      ) : (
+                        <span className="text-xs text-gray-500 font-bold w-3 shrink-0">{idx + 1}</span>
+                      )}
+                      <div className="truncate flex-1">
+                        <p className={`text-sm truncate font-bold ${currentPlaying?.track_name === qTrack.track_name ? 'text-green-500' : 'text-white'}`}>{qTrack.track_name}</p>
+                        <p className="text-xs text-gray-400 truncate">{qTrack.artists}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

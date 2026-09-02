@@ -8,3 +8,4 @@ pgvector
 sqlalchemy
 librosa
 yt-dlp
+requests

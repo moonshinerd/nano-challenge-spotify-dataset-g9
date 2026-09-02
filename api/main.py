@@ -102,11 +102,22 @@ def search_unified(query: str, limit: int = 5):
                 ).mappings().first()
                 
                 if db_match:
+                    db_genre = db_match['track_genre']
+                    if not db_genre or db_genre.strip() == "" or db_genre.lower() in ("descoberta da web", "desconhecido", "desconhecida"):
+                        new_genre = get_genres_combined(track_name, arts)
+                        if new_genre and new_genre.lower() != "descoberta da web":
+                            db_genre = new_genre
+                            conn.execute(
+                                text("UPDATE tracks SET track_genre = :g WHERE track_id = :id"),
+                                {"g": db_genre, "id": db_match['track_id']}
+                            )
+                            conn.commit()
+
                     lista.append({
-                        "track_id": db_match['track_id'], # Passamos o ID do Banco para ser instantâneo na hora de recomendar
+                        "track_id": db_match['track_id'],
                         "track_name": track_name,
                         "artists": arts,
-                        "genre": db_match['track_genre'],
+                        "genre": db_genre,
                         "thumbnail": img_url,
                         "source": "database"
                     })
@@ -132,18 +143,35 @@ def play_audio(videoId: str = None, query: str = None):
     """Retorna um redirecionamento para a URL de stream direta de áudio do YouTube."""
     try:
         if not videoId and query:
-            yt_res = yt_client.search(query, filter="songs", limit=1)
-            if yt_res:
-                videoId = yt_res[0].get('videoId')
+            yt_res = yt_client.search(query + " audio", limit=3)
+            # Try to find a valid videoId that is not None
+            for res in yt_res:
+                if res.get('videoId'):
+                    videoId = res.get('videoId')
+                    break
                 
         if not videoId:
             raise HTTPException(status_code=404, detail="Música não encontrada no YT.")
             
         # Pega a URL direta do arquivo de áudio (MP4/M4A/WEBM) dos servidores do Google
-        cmd = ['yt-dlp', '-f', 'bestaudio', '-g', f'https://music.youtube.com/watch?v={videoId}']
-        url = subprocess.check_output(cmd).decode('utf-8').strip()
-        
-        return RedirectResponse(url)
+        def iterfile():
+            import subprocess
+            process = subprocess.Popen(
+                ['yt-dlp', '-f', 'bestaudio', '-o', '-', f'https://music.youtube.com/watch?v={videoId}'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL
+            )
+            try:
+                while True:
+                    chunk = process.stdout.read(65536)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                process.terminate()
+                
+        from fastapi.responses import StreamingResponse
+        return StreamingResponse(iterfile(), media_type="audio/mp4")
     except Exception as e:
         print("Erro no streaming:", e)
         raise HTTPException(status_code=500, detail="Erro ao processar áudio.")
@@ -237,11 +265,22 @@ def find_similar(track_id: str, track_name: str, artists: str, genre: str, embed
         
         similarity_val = max(0.0, min(1.0, float(r['similarity'])))
         
+        t_genre = r['track_genre']
+        if not t_genre or t_genre.lower() == "desconhecido":
+            new_g = get_genres_combined(r['track_name'], r['artists'])
+            if new_g:
+                t_genre = new_g
+                with engine.begin() as conn_upd:
+                    conn_upd.execute(
+                        text("UPDATE tracks SET track_genre = :g WHERE track_id = :tid"),
+                        {"g": t_genre, "tid": r['track_id']}
+                    )
+        
         recomendacoes.append({
             "track_id": r['track_id'],
             "track_name": r['track_name'],
             "artists": r['artists'],
-            "genre": r['track_genre'],
+            "genre": t_genre,
             "similarity": similarity_val,
             "thumbnail": yt_data['thumbnail'] if yt_data else None,
             "url": yt_data['url'] if yt_data else None
@@ -401,7 +440,7 @@ def ensure_track_in_db(track_id: str) -> dict:
     try:
         raw_features = analyze_youtube_song(track_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao baixar áudio: {str(e)}")
+        raise HTTPException(status_code=400, detail="Essa música está bloqueada no YouTube (restrição de idade/região). Tente escolher outra versão da música na pesquisa!")
         
     normalized_vec = []
     for feat in FEATURES:
@@ -502,11 +541,22 @@ def recommend_playlist(req: PlaylistRecommendationRequest):
         yt_data = get_yt_info(r['track_name'], r['artists'])
         similarity_val = max(0.0, min(1.0, float(r['similarity'])))
         
+        t_genre = r['track_genre']
+        if not t_genre or t_genre.lower() == "desconhecido":
+            new_g = get_genres_combined(r['track_name'], r['artists'])
+            if new_g:
+                t_genre = new_g
+                with engine.begin() as conn_upd:
+                    conn_upd.execute(
+                        text("UPDATE tracks SET track_genre = :g WHERE track_id = :tid"),
+                        {"g": t_genre, "tid": r['track_id']}
+                    )
+        
         recomendacoes.append({
             "track_id": r['track_id'],
             "track_name": r['track_name'],
             "artists": r['artists'],
-            "genre": r['track_genre'],
+            "genre": t_genre,
             "similarity": similarity_val,
             "thumbnail": yt_data['thumbnail'] if yt_data else None,
             "url": yt_data['url'] if yt_data else None

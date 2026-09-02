@@ -99,3 +99,58 @@ uv run python src/04_recomendacao/recomendacao.py
 
 O significado de cada coluna do dataset (incluindo a relação entre `key` e
 `mode`) está documentado em [docs/dados_explicados.md](docs/dados_explicados.md).
+
+---
+
+# 🚀 Spotify Recommender (Aplicação Full-Stack & AI)
+
+Na fase mais avançada do projeto, a lógica de recomendação baseada em Z-Score e Distância de Cosseno foi encapsulada em uma API de alta performance e conectada a uma interface web moderna inspirada no Spotify. 
+
+A arquitetura agora evoluiu para um sistema distribuído usando **Docker Compose**, contendo:
+- **Banco de Dados Vetorial (PostgreSQL + pgvector)**
+- **API Backend (Python + FastAPI)**
+- **Aplicação Frontend (React + Vite + TailwindCSS)**
+
+## 🌟 Funcionalidades da Interface
+
+A nova interface web (`web/src/App.jsx`) não é apenas um buscador; é um ecossistema musical completo que funciona da seguinte forma:
+
+1. **Busca Híbrida Inteligente:**
+   - O usuário pode digitar o nome de qualquer música no campo de busca.
+   - O sistema procura primeiro no **Catálogo Local (Banco de Dados Vetorial)** que agora contém **mais de 820.000 músicas**.
+   - **Músicas Inéditas (Cold Start):** Se a música não for encontrada localmente, a API bate no YouTube em tempo real, faz o download do áudio, extrai os 11 atributos acústicos vitais com o *Librosa*, ajusta o *Domain Shift* matemático (para compensar o algoritmo do Spotify vs. Librosa) e injeta a nova música imediatamente no banco como um novo vetor.
+
+2. **Recomendações Acústicas Profundas:**
+   - Ao clicar em "Analisar & Recomendar" numa música, o banco vetorial usa **Cosine Similarity** sobre as 14 dimensões padronizadas para achar músicas exatamente com a mesma "Vibe" (mesma valência, energia, dançabilidade, etc).
+   - Não importa o gênero: você pode descobrir um jazz que soa identicamente como uma música de rock que você escolheu.
+   - **Garantia de Diversidade:** A recomendação é filtrada para trazer, no máximo, 2 músicas do mesmo artista, evitando bolhas de catálogo.
+
+3. **Geração de "Super Mix" (Playlist Centróide):**
+   - O usuário pode montar uma Playlist Base adicionando várias músicas num carrinho lateral.
+   - Clicando em "Gerar Super Mix ✨", a IA calcula o **Centróide Matemático** (a média perfeita multidimensional de todas as faixas escolhidas) e busca novas músicas que orbitam o centro absoluto do seu gosto musical recente.
+
+4. **Descoberta de Gêneros em Tempo Real (Lazy Load):**
+   - Músicas cadastradas massivamente que vieram sem a tag de "Gênero" entram como "desconhecido" para não engasgar o carregamento.
+   - Quando elas aparecem na tela, a API busca automaticamente as tags oficias via *iTunes API* por baixo dos panos, renderiza, e atualiza o banco de dados.
+
+5. **Audio Player Global & Queue:**
+   - Reprodução direta do áudio pelo navegador! As músicas são roteadas do *YouTube Music* através da nossa API (com um bypass do `yt-dlp` para evitar os bloqueios de estrangulamento (Bot/403) do YouTube).
+   - O player suporta tocar faixas individuais ou a playlist completa, avançando e retrocedendo (Skip Next/Prev) a fila automaticamente, com animações responsivas e um *Marquee Effect* (texto deslizante) elegante para nomes compridos.
+
+## 🛠️ Como Rodar a Interface Completa
+
+Toda a arquitetura, as dependências, e a ingestão massiva de dados estão automatizadas num orquestrador do **Docker**. Basta rodar um único comando:
+
+```bash
+docker compose up --build
+```
+
+**O que o Docker vai fazer automaticamente por você:**
+1. Subir o container `db` (Postgres com extensão de IA `pgvector`).
+2. Subir o container temporário `setup`, que vai:
+   - Carregar o Dataset Original (81k).
+   - Aplicar normalização estatística (Z-Score) baseado nas médias absolutas.
+   - Importar o Dataset Gigante Adicional (~740k músicas limpas), descartando as duplicatas (`ON CONFLICT DO NOTHING`).
+3. Somente quando o setup finalizar a ingestão dos quase **1 Milhão de vetores acústicos**, a `api` ligará na porta `:8000`.
+4. O `web` ligará na porta `:5173`. 
+5. Acesse `http://localhost:5173` no seu navegador e desfrute da recomendação pura.

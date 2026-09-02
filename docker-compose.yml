@@ -1,22 +1,6 @@
 version: '3.8'
 
 services:
-  api:
-    build: ./api
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./api:/app
-      - ./data:/data
-      - ./src:/src
-    environment:
-      - PYTHONUNBUFFERED=1
-      - DATABASE_URL=postgresql://user:password@db:5432/spotify
-    depends_on:
-      db:
-        condition: service_healthy
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
   db:
     image: ankane/pgvector:latest
     environment:
@@ -33,6 +17,46 @@ services:
       timeout: 5s
       retries: 5
 
+  setup:
+    build: ./api
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./api:/app
+      - ./data:/data
+      - ./src:/src
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://user:password@db:5432/spotify
+    command: >
+      bash -c "
+      echo 'Running database initialization...' &&
+      python save_stats.py &&
+      python init_db.py &&
+      echo 'Running massive data ingestion (this may take a few minutes)...' &&
+      python ingest_1m.py &&
+      echo 'Setup completed successfully!'
+      "
+
+  api:
+    build: ./api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app
+      - ./data:/data
+      - ./src:/src
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://user:password@db:5432/spotify
+    depends_on:
+      db:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
   web:
     build: ./web
     ports:
@@ -43,6 +67,8 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true
       - VITE_API_URL=http://172.16.0.230:8000
+    depends_on:
+      - api
     command: npm run dev -- --host 0.0.0.0
 
 volumes:
