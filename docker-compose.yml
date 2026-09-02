@@ -66,7 +66,9 @@ services:
       - /app/node_modules
     environment:
       - CHOKIDAR_USEPOLLING=true
-      - VITE_API_URL=http://172.16.0.230:8000
+      # Sem VITE_API_URL fixo de propósito: o front-end (App.jsx) usa
+      # window.location.hostname + porta 8000, então funciona tanto em
+      # localhost quanto acessando pelo IP da máquina na rede local.
     depends_on:
       - api
     command: npm run dev -- --host 0.0.0.0

@@ -38,7 +38,8 @@ from sqlalchemy import create_engine, text
 
 # Reaproveita a lógica de gênero e os pesos já usados pela API,
 # sem disparar o lifespan do FastAPI (get_genres_combined não depende do yt_client).
-from main import get_genres_combined, FEATURES
+from services.genre_service import get_genres_combined
+from config import FEATURES
 from weights import FEATURE_WEIGHTS
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@db:5432/spotify")

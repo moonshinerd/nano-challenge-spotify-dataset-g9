@@ -4,7 +4,7 @@ import numpy as np
 import yt_dlp
 import uuid
 
-def download_audio_snippet(video_id: str, duration: int = 60) -> str:
+def download_audio_snippet(video_id: str, duration: int = 300) -> str:
     """Baixa um trecho de áudio do YouTube usando yt-dlp e ffmpeg."""
     out_file = f"/tmp/{uuid.uuid4().hex}"
     
@@ -16,15 +16,23 @@ def download_audio_snippet(video_id: str, duration: int = 60) -> str:
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
+        # Duração padrão de 300s (5min) para o librosa ter mais áudio para
+        # analisar. Antes esse valor ficava fixo no código (ignorando o
+        # parâmetro `duration`); agora usa o parâmetro normalmente, então
+        # dá pra ajustar chamando download_audio_snippet(video_id, duration=N).
         'postprocessor_args': [
             '-ss', '00:00:00',
-            '-t', '300'
+            '-t', str(duration)
         ],
         'quiet': True,
         'no_warnings': True
     }
     
-    url = f"https://www.youtube.com/watch?v={video_id}"
+    # Usa music.youtube.com (não www.youtube.com): faixas exclusivas do
+    # YouTube Music (áudio oficial, sem vídeo) costumam falhar com
+    # "Video unavailable" pela URL genérica do YouTube, mas resolvem
+    # normalmente pela URL do Music — mesma URL já usada em /play no main.py.
+    url = f"https://music.youtube.com/watch?v={video_id}"
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])

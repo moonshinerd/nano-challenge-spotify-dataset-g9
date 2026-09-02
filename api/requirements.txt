@@ -6,6 +6,7 @@ ytmusicapi
 psycopg2-binary
 pgvector
 sqlalchemy
+alembic
 librosa
 yt-dlp
 requests

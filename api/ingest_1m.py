@@ -104,10 +104,20 @@ if inserts:
 print("Construindo índice HNSW para buscas em milissegundos...")
 try:
     cur.execute("SET maintenance_work_mem = '2GB';")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_tracks_embedding ON tracks USING hnsw (embedding vector_cosine_ops);")
     conn.commit()
+    # CONCURRENTLY é essencial aqui: um CREATE INDEX normal toma um lock
+    # (SHARE) na tabela que bloqueia INSERT/UPDATE/DELETE até o índice
+    # terminar de ser construído. Com uma tabela de ~800k+ linhas isso pode
+    # levar vários minutos — e qualquer usuário buscando uma música nova
+    # nesse meio tempo (fluxo de cold-start em main.py, que faz um INSERT)
+    # fica travado esperando o lock, sem nenhum log ou timeout visível.
+    # CONCURRENTLY evita esse lock (ao custo de não poder rodar dentro de
+    # uma transação, por isso o autocommit abaixo).
+    conn.autocommit = True
+    cur.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tracks_embedding ON tracks USING hnsw (embedding vector_cosine_ops);")
     print("Índice construído com sucesso!")
 except Exception as e:
     print("Aviso ao construir o índice:", e)
-    conn.rollback()
+finally:
+    conn.autocommit = False
 

@@ -44,7 +44,12 @@ function App() {
   const [loadingSearch, setLoadingSearch] = useState(false)
   const [loadingRecs, setLoadingRecs] = useState(false)
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  // Usa a mesma "casa" (hostname) que o navegador usou para acessar o app,
+  // trocando só a porta para a da API. Assim funciona tanto em localhost
+  // quanto acessando pelo IP da máquina na rede (ex: 192.168.x.x:5173),
+  // sem precisar fixar um IP no docker-compose.yml (que muda a cada rede
+  // Docker recriada). VITE_API_URL continua funcionando como override manual.
+  const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000`
 
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0)
 
