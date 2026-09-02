@@ -6,6 +6,7 @@ import psycopg2
 from psycopg2.extras import execute_values
 
 sys.path.insert(0, '/src/shared')
+sys.path.insert(0, '/app')  # scripts/ roda fora de api/; /app é onde o Dockerfile monta api/ (para importar core/weights.py)
 from dados import carregar_dataset, construir_df_unique
 
 DB_HOST = "db"
@@ -19,27 +20,14 @@ FEATURES = [
     'duration_ms', 'explicit', 'time_signature',
 ]
 
-def create_table_if_not_exists(cur):
-    print("Verificando/Criando tabela 'tracks' e extensão vector...")
-    cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS tracks (
-            track_id VARCHAR PRIMARY KEY,
-            track_name VARCHAR,
-            artists VARCHAR,
-            track_genre VARCHAR,
-            embedding vector(14)
-        );
-    """)
-    print("Tabela 'tracks' pronta.")
-
 def init_db():
+    # Schema (extensão vector, tabela, índice HNSW) é responsabilidade do
+    # Alembic agora (alembic/versions/..._initial_schema_tracks_table.py) —
+    # roda como passo separado antes deste script (ver docker-compose.yml).
+    # Este script cuida só da carga de dados (seed) do dataset original.
     print("Conectando ao PostgreSQL...")
     conn = psycopg2.connect(host=DB_HOST, dbname=DB_NAME, user=DB_USER, password=DB_PASS)
     cur = conn.cursor()
-    
-    create_table_if_not_exists(cur)
-    conn.commit()
 
     print("Carregando CSV original (Base Kaggle)...")
     dataset_path = Path("/data/raw/dataset.csv")
@@ -52,7 +40,7 @@ def init_db():
     df_unique['explicit'] = df_unique['explicit'].astype(int)
 
     print("Calculando matriz normalizada (z-score)...")
-    from weights import FEATURE_WEIGHTS
+    from core.weights import FEATURE_WEIGHTS
     
     medias = df_unique[FEATURES].mean()
     desvios = df_unique[FEATURES].std()

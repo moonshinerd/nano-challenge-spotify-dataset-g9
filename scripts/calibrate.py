@@ -9,7 +9,7 @@ from ytmusicapi import YTMusic
 # aponta manualmente para api/ e src/shared/ em vez de depender do cwd.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "api"))
 sys.path.insert(0, '/src/shared')
-from audio_analyzer import extract_features, download_audio_snippet
+from services.audio_analyzer import extract_features, download_audio_snippet
 from dados import carregar_dataset, construir_df_unique
 
 FEATURES = [

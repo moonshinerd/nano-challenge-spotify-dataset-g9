@@ -1,8 +1,11 @@
+import sys
 import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_batch
 import json
-from weights import FEATURE_WEIGHTS
+
+sys.path.insert(0, '/app')  # scripts/ roda fora de api/; /app é onde o Dockerfile monta api/ (para importar core/weights.py)
+from core.weights import FEATURE_WEIGHTS
 
 FEATURES = [
     'danceability', 'energy', 'key', 'loudness', 'mode', 
@@ -101,23 +104,9 @@ if inserts:
     conn.commit()
     print(f"Finalizado! Inseridas {count} músicas no total. (Ignoradas: {skipped})")
 
-print("Construindo índice HNSW para buscas em milissegundos...")
-try:
-    cur.execute("SET maintenance_work_mem = '2GB';")
-    conn.commit()
-    # CONCURRENTLY é essencial aqui: um CREATE INDEX normal toma um lock
-    # (SHARE) na tabela que bloqueia INSERT/UPDATE/DELETE até o índice
-    # terminar de ser construído. Com uma tabela de ~800k+ linhas isso pode
-    # levar vários minutos — e qualquer usuário buscando uma música nova
-    # nesse meio tempo (fluxo de cold-start em main.py, que faz um INSERT)
-    # fica travado esperando o lock, sem nenhum log ou timeout visível.
-    # CONCURRENTLY evita esse lock (ao custo de não poder rodar dentro de
-    # uma transação, por isso o autocommit abaixo).
-    conn.autocommit = True
-    cur.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tracks_embedding ON tracks USING hnsw (embedding vector_cosine_ops);")
-    print("Índice construído com sucesso!")
-except Exception as e:
-    print("Aviso ao construir o índice:", e)
-finally:
-    conn.autocommit = False
+# O índice HNSW (CREATE INDEX CONCURRENTLY) é criado pelo Alembic — ver
+# alembic/versions/..._initial_schema_tracks_table.py — como passo separado
+# antes deste script (ver docker-compose.yml). Manter aqui seria redundante
+# e, se rodasse antes do Alembic, correria o risco de ser um CREATE INDEX
+# comum (bloqueante) em vez do CONCURRENTLY.
 

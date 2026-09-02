@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import config
+from core import config
 from routers import play, recommend, search, thumbnail
 from services import youtube_service
 
@@ -31,7 +31,7 @@ def _warmup_librosa():
         import numpy as np
         import soundfile as sf
 
-        from audio_analyzer import extract_features
+        from services.audio_analyzer import extract_features
 
         t0 = time.time()
         sr = 22050

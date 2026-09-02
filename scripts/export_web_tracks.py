@@ -26,7 +26,7 @@ sobrescrever o que já existe):
    resolveu, permitindo mesclar de volta no dataset original depois.
 
 Uso (dentro do container da API):
-    docker compose exec api python export_web_tracks.py
+    docker compose exec api python /scripts/export_web_tracks.py
 """
 import json
 import os
@@ -36,11 +36,13 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, text
 
+sys.path.insert(0, '/app')  # scripts/ roda fora de api/; /app é onde o Dockerfile monta api/
+
 # Reaproveita a lógica de gênero e os pesos já usados pela API,
 # sem disparar o lifespan do FastAPI (get_genres_combined não depende do yt_client).
 from services.genre_service import get_genres_combined
-from config import FEATURES
-from weights import FEATURE_WEIGHTS
+from core.config import FEATURES
+from core.weights import FEATURE_WEIGHTS
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@db:5432/spotify")
 engine = create_engine(DATABASE_URL)

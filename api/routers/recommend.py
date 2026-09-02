@@ -2,8 +2,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from database import get_db
-from schemas import PlaylistRecommendationRequest, RecommendationRequest
+from core.database import get_db
+from core.schemas import PlaylistRecommendationRequest, RecommendationRequest
 from services.recommend_service import ensure_track_in_db, find_similar, recommend_for_playlist
 
 router = APIRouter()

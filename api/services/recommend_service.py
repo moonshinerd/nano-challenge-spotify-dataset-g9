@@ -6,13 +6,13 @@ from fastapi import HTTPException
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-import config
-from audio_analyzer import analyze_youtube_song
-from models import Track
+from core import config
+from core.models import Track
+from core.weights import FEATURE_WEIGHTS
 from services import youtube_service
+from services.audio_analyzer import analyze_youtube_song
 from services.genre_service import genre_needs_refresh, get_genres_combined
 from services.youtube_service import get_yt_info
-from weights import FEATURE_WEIGHTS
 
 
 def normalize_features(raw_features: dict) -> list:

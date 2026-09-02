@@ -11,8 +11,8 @@ from alembic import context
 # cwd durante `alembic revision --autogenerate` pode variar).
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import Base  # noqa: E402
-import models  # noqa: E402, F401  (import garante que Track é registrado em Base.metadata)
+from core.database import Base  # noqa: E402
+from core import models  # noqa: E402, F401  (import garante que Track é registrado em Base.metadata)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

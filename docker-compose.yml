@@ -24,6 +24,7 @@ services:
         condition: service_healthy
     volumes:
       - ./api:/app
+      - ./scripts:/scripts
       - ./data:/data
       - ./src:/src
     environment:
@@ -31,11 +32,15 @@ services:
       - DATABASE_URL=postgresql://user:password@db:5432/spotify
     command: >
       bash -c "
+      echo 'Applying database migrations (Alembic)...' &&
+      alembic upgrade head &&
       echo 'Running database initialization...' &&
-      python save_stats.py &&
-      python init_db.py &&
+      python /scripts/save_stats.py &&
+      python /scripts/init_db.py &&
       echo 'Running massive data ingestion (this may take a few minutes)...' &&
-      python ingest_1m.py &&
+      python /scripts/ingest_1m.py &&
+      echo 'Loading previously discovered tracks/genres (data/raw/musicas_web_descobertas.csv, generos_dataset_identificados.csv)...' &&
+      python /scripts/load_exported_tracks.py &&
       echo 'Setup completed successfully!'
       "
 
@@ -45,6 +50,7 @@ services:
       - "8000:8000"
     volumes:
       - ./api:/app
+      - ./scripts:/scripts
       - ./data:/data
       - ./src:/src
     environment:

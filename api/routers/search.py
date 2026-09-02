@@ -2,8 +2,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from database import get_db
-from models import Track
+from core.database import get_db
+from core.models import Track
 from services import youtube_service
 from services.genre_service import get_genres_combined, get_itunes_cover, genre_needs_refresh
 

@@ -2,7 +2,7 @@
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, Index, String
 
-from database import Base
+from core.database import Base
 
 # Número de dimensões do vetor de embedding (features de áudio ponderadas
 # e normalizadas por z-score — ver weights.py e config.FEATURES).
