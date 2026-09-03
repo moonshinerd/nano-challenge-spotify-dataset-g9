@@ -7,7 +7,7 @@ import uuid
 def download_audio_snippet(video_id: str, duration: int = 300) -> str:
     """Baixa um trecho de áudio do YouTube usando yt-dlp e ffmpeg."""
     out_file = f"/tmp/{uuid.uuid4().hex}"
-    
+
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': out_file + '.%(ext)s',
@@ -27,19 +27,30 @@ def download_audio_snippet(video_id: str, duration: int = 300) -> str:
         'quiet': True,
         'no_warnings': True
     }
-    
-    # Usa music.youtube.com (não www.youtube.com): faixas exclusivas do
-    # YouTube Music (áudio oficial, sem vídeo) costumam falhar com
-    # "Video unavailable" pela URL genérica do YouTube, mas resolvem
-    # normalmente pela URL do Music — mesma URL já usada em /play no main.py.
-    url = f"https://music.youtube.com/watch?v={video_id}"
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-        return out_file + '.mp3'
-    except Exception as e:
-        print(f"Erro ao baixar áudio: {e}")
-        return None
+
+    # Tenta music.youtube.com primeiro (resolve a maioria das faixas
+    # exclusivas do YT Music, que costumam falhar com "Video unavailable"
+    # pela URL genérica), e cai pra www.youtube.com como fallback — algumas
+    # faixas dão o caminho inverso: bloqueadas/indisponíveis no YT Music mas
+    # com uma versão normal (às vezes de outro canal/upload) acessível pelo
+    # YouTube comum.
+    urls = [
+        f"https://music.youtube.com/watch?v={video_id}",
+        f"https://www.youtube.com/watch?v={video_id}",
+    ]
+
+    last_error = None
+    for url in urls:
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+            return out_file + '.mp3'
+        except Exception as e:
+            last_error = e
+            print(f"Erro ao baixar áudio de {url}: {e}")
+
+    print(f"Falha em todas as fontes para {video_id}. Último erro: {last_error}")
+    return None
 
 def extract_features(audio_path: str):
     """

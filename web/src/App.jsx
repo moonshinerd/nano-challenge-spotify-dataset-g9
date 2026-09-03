@@ -13,6 +13,28 @@ const handleCoverError = (e) => {
   e.target.src = FALLBACK_COVER
 }
 
+// Monta uma mensagem de erro descritiva a partir de um erro do axios, em
+// vez do genérico "Erro ao buscar X" — isso importa MUITO pra diagnosticar
+// problemas de rede/proxy/CORS, que se comportam de forma bem diferente
+// entre si (erro instantâneo de conexão recusada vs. timeout vs. erro real
+// do servidor) mas antes todos apareciam com a mesma mensagem vaga.
+function describeRequestError(error, action) {
+  if (error.response) {
+    // O servidor respondeu, mas com um status de erro (4xx/5xx)
+    const detail = error.response.data?.detail || error.response.statusText || "sem detalhes"
+    return `Erro ao ${action}: o servidor respondeu ${error.response.status} (${detail})`
+  }
+  if (error.request) {
+    // A requisição foi enviada mas nenhuma resposta chegou — conexão
+    // recusada, timeout, DNS, CORS bloqueado, proxy/túnel indisponível etc.
+    // error.code ajuda a diferenciar (ex.: ERR_NETWORK, ECONNABORTED).
+    const code = error.code ? ` [${error.code}]` : ""
+    return `Erro ao ${action}: sem resposta do servidor${code} — ${error.message}. Verifique sua conexão ou se o backend está no ar.`
+  }
+  // Erro ao montar a própria requisição (raro)
+  return `Erro ao ${action}: ${error.message}`
+}
+
 function App() {
   const [errorMsg, setErrorMsg] = useState(null);
   const [toast, setToast] = useState(null);
@@ -74,12 +96,15 @@ function App() {
   const [loadingSearch, setLoadingSearch] = useState(false)
   const [loadingRecs, setLoadingRecs] = useState(false)
 
-  // Usa a mesma "casa" (hostname) que o navegador usou para acessar o app,
-  // trocando só a porta para a da API. Assim funciona tanto em localhost
-  // quanto acessando pelo IP da máquina na rede (ex: 192.168.x.x:5173),
-  // sem precisar fixar um IP no docker-compose.yml (que muda a cada rede
-  // Docker recriada). VITE_API_URL continua funcionando como override manual.
-  const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000`
+  // Por padrão, caminho relativo (mesma origem/porta da própria página):
+  // o Vite (vite.config.js) faz proxy de /search, /recommend, /play etc.
+  // pro container da API. Assim o navegador só precisa falar com UMA porta
+  // (a do front), o que evita problemas de rede específicos de porta (ex.:
+  // roteadores que reservam/bloqueiam certas portas) ao acessar de outro
+  // dispositivo — funciona em localhost e pelo IP da máquina na rede sem
+  // precisar fixar endereço nenhum. VITE_API_URL continua disponível como
+  // override manual (ex.: apontar pra uma API rodando em outro host).
+  const API_URL = import.meta.env.VITE_API_URL || ''
 
   // Passa as capas pelo nosso backend (/thumbnail) em vez de carregar
   // direto de googleusercontent.com/mzstatic.com: algumas redes/navegadores
@@ -163,7 +188,7 @@ function App() {
     } catch (error) {
       if (requestId !== searchRequestIdRef.current) return
       console.error(error)
-      setToast("Erro ao buscar músicas."); setTimeout(() => setToast(null), 5000)
+      setToast(describeRequestError(error, "buscar músicas")); setTimeout(() => setToast(null), 8000)
     }
     if (requestId === searchRequestIdRef.current) setLoadingSearch(false)
   }
@@ -193,9 +218,8 @@ function App() {
     } catch (error) {
       console.error(error)
       setSearchResults(oldSearch)
-      const msg = error.response?.data?.detail || "Erro ao buscar recomendações.";
-      setToast(msg)
-      setTimeout(() => setToast(null), 5000)
+      setToast(describeRequestError(error, "buscar recomendações"))
+      setTimeout(() => setToast(null), 8000)
     }
     setLoadingRecs(false)
   }
@@ -224,7 +248,8 @@ function App() {
       setSelectedTracks([]) 
     } catch (error) {
       console.error(error)
-      setToast("Erro ao buscar recomendações para a playlist."); setTimeout(() => setToast(null), 5000)
+      setToast(describeRequestError(error, "buscar recomendações para a playlist"))
+      setTimeout(() => setToast(null), 8000)
     }
     setLoadingRecs(false)
   }
@@ -309,9 +334,9 @@ function App() {
     >
       {/* TOAST NOTIFICATION */}
       {toast && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-3 animate-fade-in">
-          <X size={18} className="cursor-pointer hover:text-gray-200" onClick={() => setToast(null)} />
-          <span className="font-bold text-sm md:text-base">{toast}</span>
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-2xl shadow-2xl z-50 flex items-start gap-3 animate-fade-in max-w-[92vw] sm:max-w-lg">
+          <X size={18} className="cursor-pointer hover:text-gray-200 shrink-0 mt-0.5" onClick={() => setToast(null)} />
+          <span className="font-bold text-sm md:text-base break-words">{toast}</span>
         </div>
       )}
       <div className="flex-1 w-full max-w-4xl mx-auto transition-all duration-500">

@@ -38,4 +38,19 @@ class Track(Base):
             postgresql_using="hnsw",
             postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
+        # Índices GIN/trigram usados pelo /search (ILIKE '%termo%' em
+        # track_name/artists) — criação real via CONCURRENTLY na migration
+        # a42301cb4e2b_add_trigram_indexes_for_track_search.py.
+        Index(
+            "idx_tracks_name_trgm",
+            track_name,
+            postgresql_using="gin",
+            postgresql_ops={"track_name": "gin_trgm_ops"},
+        ),
+        Index(
+            "idx_tracks_artists_trgm",
+            artists,
+            postgresql_using="gin",
+            postgresql_ops={"artists": "gin_trgm_ops"},
+        ),
     )
