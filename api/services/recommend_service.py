@@ -50,7 +50,17 @@ def ensure_track_in_db(db: Session, track_id: str) -> Track:
 
     try:
         raw_features = analyze_youtube_song(track_id)
-    except Exception:
+    except Exception as e:
+        # "Sign in to confirm you're not a bot" é o YouTube fazendo
+        # detecção anti-bot (rate limit por IP), não uma restrição real de
+        # idade/região da música — merece uma mensagem diferente, já que
+        # "escolher outra versão" não resolve (o bloqueio é do nosso IP,
+        # não da faixa).
+        if "not a bot" in str(e).lower() or "sign in to confirm" in str(e).lower():
+            raise HTTPException(
+                status_code=429,
+                detail="O YouTube está limitando os downloads deste servidor (detecção de bot/rate limit). Aguarde um pouco e tente de novo.",
+            )
         raise HTTPException(
             status_code=400,
             detail="Essa música está bloqueada no YouTube (restrição de idade/região). Tente escolher outra versão da música na pesquisa!",
